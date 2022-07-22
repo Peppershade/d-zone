@@ -3,11 +3,6 @@ const path = require('path');
 
 // Define a schema
 const config = convict({
-    domain: {
-        doc: 'The URL of your websocket server.',
-        format: String,
-        default: 'example.com'
-    },
     address: {
         doc: 'The address/URL of your websocket server.',
         format: String,
