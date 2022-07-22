@@ -11,7 +11,7 @@ var commandCooldowns = {};
 
 function Inbox(config) {
     EventEmitter.call(this);
-    var bot = new Eris(process.env.TOKEN, {
+    var bot = new Eris(process.env.token, {
         getAllUsers: true,
         intents: ['guilds', 'guildMembers', 'guildPresences', 'guildMessages', 'directMessages']
     });
@@ -28,7 +28,7 @@ function Inbox(config) {
         if(Date.now() - (commandCooldowns[channel.id] || 0) < 30 * 1000) return;
         commandCooldowns[channel.id] = Date.now();
         let info = config.get('url');
-        let server = channel.guild && self.servers[channel.guild.id];
+        let server = channel.guild && self.servers.get(channel.guild.id);
         if(server) {
             info += '?s=' + server.id;
             if(server.password) info += '&p=' + server.password;
@@ -41,70 +41,40 @@ function Inbox(config) {
         var serverList = config.get('servers');
         var serverIDs = [];
         self.servers = new Map();
-        var defaultSet = false;
-        for (let guild of bot.guilds.map((x) => x)) {
-            // if auto populate is turned off don't track
-            if(!config.get('autoPopulate')) {
-                if(!serverList.map((server) => server.id).includes(guild.id)) {
-                    continue
-                }
+        for(let server of serverList) {
+            let guild = bot.guilds.get(server.id);
+            if(!guild) { // Skip unknown servers
+                console.log('Unknown server ID:', server.id);
+                continue;
             }
-            var server = serverList.find(function(server) {return guild.id == server.id});
-            if(!server) server = {};
-
-            var newServer = {};
-            newServer.discordID = guild.id;
-            newServer.name = server.alias || guild.name;
-            if (server.default) defaultSet = true;
-            newServer.default = server.default || false;
+            var newServer = {
+                discordID: server.id,
+                name: server.alias || guild.name,
+                default: server.default
+            };
             newServer.id = util.abbreviate(newServer.name, serverIDs);
             serverIDs.push(newServer.id);
             if(server.password) newServer.password = server.password;
+            if(server.ignoreUsers) newServer.ignoreUsers = server.ignoreUsers;
             if(server.ignoreChannels) newServer.ignoreChannels = server.ignoreChannels;
             if(server.listenChannels) newServer.listenChannels = server.listenChannels;
-            self.servers.set(guild.id, newServer);
+            if(server.hideOffline) newServer.hideOffline = true
+            self.servers.set(server.id, newServer);
         }
-
-        // define default server if default is not set
-        if(!defaultSet) {
-            let key = self.servers.keys().next().value;
-            let value = self.servers.values().next().value;
-            value.default = true;
-            self.servers.set(key, value)
-        }
-
         console.log('Connected to', self.servers.size, 'server(s)');
         self.emit('connected');
         setInterval(setPresence, 60 * 1000);
         setPresence();
-
-        bot.on('guildCreate', (guild) => {
-            var newServer = {};
-            newServer.discordID = guild.id;
-            newServer.name = guild.name;
-            newServer.default = false;
-            newServer.id = util.abbreviate(newServer.name, []);
-
-            self.servers.set(guild.id, newServer);
-            console.log("hi")
-        });
-        bot.on('guildDelete', (guild) => {
-            self.servers.delete(guild.id);
-            console.log("bye")
-        });
-
-        bot.on('messageCreate', (msg) => {
-            var author = msg.author;
-            var channel = msg.channel;
-            var message = msg.cleanContent;
+        bot.on('messageCreate', ({ author, member, channel, cleanContent: message }) => {
             if(author.id === bot.user.id) return; // Don't listen to yourself, bot
             if(!channel.guild) return respond(channel); // Private message
             var serverID = channel.guild.id;
             let server = self.servers.get(serverID);
             if(!server) return;
             if(config.get('infoCommand') && config.get('url') && message === config.get('infoCommand')) return respond(channel);
+            if(server.hideOffline && (!member.status || member.status === 'offline')) return;
             if(server.ignoreUsers && // Check if this user is ignored
-                server.ignoreUsers.indexOf(author.id)) return;
+                server.ignoreUsers.indexOf(author.id) >= 0) return;
             if(server.ignoreChannels && // Check if this channel is ignored
                 (server.ignoreChannels.indexOf(channel.name) >= 0 ||
                     server.ignoreChannels.indexOf(channel.id) >= 0)) return;
@@ -116,11 +86,22 @@ function Inbox(config) {
                 data: { uid: author.id, message, channel: channel.id }
             });
         });
-        bot.on('presenceUpdate', ({ id, status, guild }) => {
-            if(!self.servers.has(guild.id)) return;
-            self.emit('presence', {
-                type: 'presence', server: guild.id, data: { uid: id, status }
-            });
+        bot.on('presenceUpdate', (member) => {
+            let { id, status, nick, username, guild } = member
+            var serverID = guild.id;
+            let server = self.servers.get(serverID);
+            if(!server) return;
+            let data = {
+                type: 'presence', server: serverID, data: { uid: id, status }
+            }
+            if(server.hideOffline && status && status !== 'offline') {
+                data.data.username = nick || username;
+                data.data.roleColor = getRoleColor(member, guild)
+            }
+            if(server.hideOffline && (!status || status === 'offline')) {
+                data.data.delete = true
+            }
+            self.emit('presence', data);
         });
     });
     bot.on('disconnect', () => console.log("Bot disconnected, reconnecting..."));
@@ -129,34 +110,29 @@ function Inbox(config) {
 }
 
 Inbox.prototype.getUsers = function(connectRequest) {
-    if(!this.servers) return;
     let server = this.servers.get(connectRequest.server) ||
         Array.from(this.servers.values()).find(s => s.id === connectRequest.server || s.default && connectRequest.server === 'default');
     if(!server) return 'unknown-server';
+    console.log('Should be logging now 1.0');
+    console.log(server.ignoreUsers);
     if(server.password && server.password !== connectRequest.password) return 'bad-password';
     let guild = this.bot.guilds.get(server.discordID);
     if(!guild) return 'unknown-server';
     let users = {};
     for(let [uid, member] of guild.members) {
+        if(server.hideOffline && (!member.status || member.status === 'offline')) continue;
+        if(server.ignoreUsers && server.ignoreUsers.indexOf(uid) >= 0) continue;
         users[uid] = {
-            id: uid,
+            uid,
             username: member.nick || member.username,
             status: member.status
         };
-        users[uid].roleColor = false;
-        let rolePosition = -1;
-        for(let roleID of member.roles) {
-            let role = guild.roles.get(roleID);
-            if(!role || !role.color || role.position < rolePosition) continue;
-            users[uid].roleColor = '#' + ('00000' + role.color.toString(16)).substr(-6);
-            rolePosition = role.position;
-        }
+        users[uid].roleColor = getRoleColor(member, guild);
     }
     return { server, userList: users };
 };
 
 Inbox.prototype.getServers = function() {
-    if(!this.servers) return;
     let serverList = {};
     for(let [sKey, server] of this.servers.entries()) {
         serverList[sKey] = { id: server.id, name: server.name };
@@ -165,3 +141,15 @@ Inbox.prototype.getServers = function() {
     }
     return serverList;
 };
+
+function getRoleColor(member, guild) {
+    let roleColor = false
+    let rolePosition = -1;
+    for(let roleID of member.roles) {
+        let role = guild.roles.get(roleID);
+        if(!role || !role.color || role.position < rolePosition) continue;
+        roleColor = '#' + ('00000' + role.color.toString(16)).substr(-6);
+        rolePosition = role.position;
+    }
+    return roleColor
+}
