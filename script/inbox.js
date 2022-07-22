@@ -55,6 +55,7 @@ function Inbox(config) {
             newServer.id = util.abbreviate(newServer.name, serverIDs);
             serverIDs.push(newServer.id);
             if(server.password) newServer.password = server.password;
+            if(server.ignoreUsers) newServer.ignoreUsers = server.ignoreUsers;
             if(server.ignoreChannels) newServer.ignoreChannels = server.ignoreChannels;
             if(server.listenChannels) newServer.listenChannels = server.listenChannels;
             if(server.hideOffline) newServer.hideOffline = true
@@ -73,7 +74,7 @@ function Inbox(config) {
             if(config.get('infoCommand') && config.get('url') && message === config.get('infoCommand')) return respond(channel);
             if(server.hideOffline && (!member.status || member.status === 'offline')) return;
             if(server.ignoreUsers && // Check if this user is ignored
-                server.ignoreUsers.indexOf(author.id)) return;
+                server.ignoreUsers.indexOf(author.id) >= 0) return;
             if(server.ignoreChannels && // Check if this channel is ignored
                 (server.ignoreChannels.indexOf(channel.name) >= 0 ||
                     server.ignoreChannels.indexOf(channel.id) >= 0)) return;
@@ -118,6 +119,7 @@ Inbox.prototype.getUsers = function(connectRequest) {
     let users = {};
     for(let [uid, member] of guild.members) {
         if(server.hideOffline && (!member.status || member.status === 'offline')) continue;
+        if(server.ignoreUsers && server.ignoreUsers.indexOf(uid) >= 0) continue;
         users[uid] = {
             uid,
             username: member.nick || member.username,
