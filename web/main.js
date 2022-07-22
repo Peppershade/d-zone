@@ -37,7 +37,7 @@ function initWebsocket() {
     var Decorator = require('./script/props/decorator.js');
     var users, world, decorator;
     
-    if(window.location.protocol == 'HTTPS') { var wssprotocol = 'wss://'} else { var wssprotocol = 'ws://'}
+    if(window.location.protocol == 'https:') { var wssprotocol = 'wss://'} else { var wssprotocol = 'ws://'}
 
     var socketURL = wssprotocol + window.location.host
     console.log('Initializing websocket on', socketURL);
