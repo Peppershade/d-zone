@@ -7,7 +7,7 @@ var Canvas = require('./script/engine/canvas.js');
 var UI = require('./script/ui/ui.js');
 var bs = require('browser-storage');
 var packageInfo = require('./../package.json');
-var socketConfig = require('./../socket-config.json');
+//var socketConfig = require('./../socket-config.json');
 
 // TODO: Loading screen while preloading images, connecting to websocket, and generating world
 console.log('Loading...');
@@ -37,7 +37,7 @@ function initWebsocket() {
     var Decorator = require('./script/props/decorator.js');
     var users, world, decorator;
 
-    var socketURL = socketConfig.websocket_url;
+    var socketURL = window.location.host
     console.log('Initializing websocket on', socketURL);
 
     // Swap the comments on the next 3 lines to switch between your websocket server and a virtual one
