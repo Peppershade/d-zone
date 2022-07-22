@@ -1,3 +1,4 @@
+
 'use strict';
 const Eris = require('eris');
 var EventEmitter = require("events").EventEmitter;
@@ -55,7 +56,6 @@ function Inbox(config) {
             newServer.id = util.abbreviate(newServer.name, serverIDs);
             serverIDs.push(newServer.id);
             if(server.password) newServer.password = server.password;
-            if(server.ignoreUsers) newServer.ignoreUsers = server.ignoreUsers;
             if(server.ignoreChannels) newServer.ignoreChannels = server.ignoreChannels;
             if(server.listenChannels) newServer.listenChannels = server.listenChannels;
             if(server.hideOffline) newServer.hideOffline = true
@@ -113,8 +113,6 @@ Inbox.prototype.getUsers = function(connectRequest) {
     let server = this.servers.get(connectRequest.server) ||
         Array.from(this.servers.values()).find(s => s.id === connectRequest.server || s.default && connectRequest.server === 'default');
     if(!server) return 'unknown-server';
-    console.log('Should be logging now 1.0');
-    console.log(server.ignoreUsers);
     if(server.password && server.password !== connectRequest.password) return 'bad-password';
     let guild = this.bot.guilds.get(server.discordID);
     if(!guild) return 'unknown-server';
