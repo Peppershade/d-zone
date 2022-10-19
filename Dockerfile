@@ -14,10 +14,10 @@ RUN git clone -b master https://github.com/d-zone-org/d-zone.git /app/d-zone
 # Install project
 RUN cd /app/d-zone
 COPY root/ /
-RUN npm install --no-optional
-RUN npm run-script build
 RUN git apply /app/d-zone/docker.patch
 RUN rm /app/d-zone/docker.patch
+RUN npm install --no-optional
+RUN npm run-script build
 RUN apk del --purge git
 RUN rm -rf /root/.cache /tmp/*
 RUN rm /app/d-zone/socket-config.json

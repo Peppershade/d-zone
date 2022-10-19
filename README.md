@@ -12,7 +12,7 @@ Hopefully the simulation is interesting to watch. You can see the current (unint
 
 ## Installation
 
-The Docker installation is very straightforward.
+The Docker installation is very straightforward. You may need to change PUID and PGID to your user, default is root user. Choose a path or volume for storing the configuration of d-zone. 
 
 ```
 docker create \
@@ -31,7 +31,7 @@ docker create \
 
 1-command build
 ```
-git clone --branch v1/docker https://github.com/peppershade/d-zone.git
+git clone --branch v1/docker https://github.com/d-zone-org/d-zone.git
 cd d-zone
 docker build -t peppershade/d-zone:latest .
 ```
@@ -52,3 +52,6 @@ Core client modules such as the renderer and input controller are loosely based 
 _Disclaimer: I cannot be held responsible for anything that happens to your computer, your server, your bot, or anything else as a result of using this package._
 
 _Please consider the privacy of the users on your server. D-Zone will allow anyone with the URL (and password, if used) to monitor the chat of anyone in any channel that your bot has permission to see._
+
+### Credits
+Docker image provided by @Peppershade and @LittlestFluffy
